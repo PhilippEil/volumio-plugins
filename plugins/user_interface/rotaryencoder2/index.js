@@ -54,7 +54,6 @@ function rotaryencoder2(context) {
 	this.commandRouter = this.context.coreCommand;
 	this.logger = this.context.logger;
 	this.configManager = this.context.configManager;
-
 }
 
 
@@ -72,20 +71,15 @@ rotaryencoder2.prototype.onVolumioStart = function()
 rotaryencoder2.prototype.onStart = function() {
     var self = this;
 	var defer=libQ.defer();
-	var activate = [];
-
+	
 	self.debugLogging = (self.config.get('logging')==true);
 	self.handles=[].fill(null,0,maxRotaries);
 	self.buttons=[].fill(null,0,maxRotaries);
 	self.pushDownTime=[].fill(0,0,maxRotaries);
 	self.status=null;
+	self.loadI18nStrings();
 
 	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] onStart: Config loaded: ' + JSON.stringify(self.config));
-	for (let i = 0; i < maxRotaries; i++) {
-		if (self.config.get('enabled'+i)) {
-			activate.push(i);
-		}	
-	}
 
 	self.socket = io.connect('http://localhost:3000');
 	self.socket.emit('getState');
@@ -95,9 +89,9 @@ rotaryencoder2.prototype.onStart = function() {
 		// if (self.debugLogging) self.logger.info('[ROTARYENCODER2] received Websock Status: ' + JSON.stringify(self.status));
 	})
 
-	self.activateRotaries(activate)
+	self.activateRotaries([...Array(maxRotaries).keys()])
 	.then(_=>{
-		return self.activateButtons(activate)
+		return self.activateButtons([...Array(maxRotaries).keys()])
 	})
 	.then(_=> {
 		self.commandRouter.pushToastMessage('success',"Rotary Encoder II - successfully loaded")
@@ -105,7 +99,7 @@ rotaryencoder2.prototype.onStart = function() {
 		defer.resolve();				
 	})
 	.fail(error => {
-		// self.commandRouter.pushToastMessage('error',"Rotary Encoder II", self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_STOP_FAIL'))
+		self.commandRouter.pushToastMessage('error',"Rotary Encoder II", self.getI18nString('ROTARYENCODER2.TOAST_STOP_FAIL'))
 		self.logger.error('[ROTARYENCODER2] onStart: Rotarys not initialized: '+error);
 		defer.reject();
 	});
@@ -116,30 +110,24 @@ rotaryencoder2.prototype.onStart = function() {
 rotaryencoder2.prototype.onStop = function() {
     var self = this;
     var defer=libQ.defer();
-	var deactivate=[];
 
 	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] onStop: Stopping Plugin.');
-	for (let i = 0; i < maxRotaries; i++) {
-		if (self.config.get('enabled'+i)) {
-			deactivate.push(i);
-		}	
-	}
 
-	self.deactivateRotaries(deactivate)
+	self.deactivateRotaries([...Array(maxRotaries).keys()])
 	.then(_=>{
-		return self.deactivateButtons(deactivate)
+		return self.deactivateButtons([...Array(maxRotaries).keys()])
 	})
 	.then(_=> {
 		self.socket.off('pushState');
 		self.socket.disconnect();
 	})
 	.then(_=>{
-		self.commandRouter.pushToastMessage('success',"Rotary Encoder II", self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_STOP_SUCCESS'))
+		self.commandRouter.pushToastMessage('success',"Rotary Encoder II", self.getI18nString('ROTARYENCODER2.TOAST_STOP_SUCCESS'))
 		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] onStop: Plugin successfully stopped.');				
 		defer.resolve();	
 	})
 	.fail(err=>{
-		self.commandRouter.pushToastMessage('success',"Rotary Encoder II", self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_STOP_FAIL'))
+		self.commandRouter.pushToastMessage('success',"Rotary Encoder II", self.getI18nString('ROTARYENCODER2.TOAST_STOP_FAIL'))
 		self.logger.error('[ROTARYENCODER2] onStop: Failed to cleanly stop plugin.'+err);				
 		defer.reject();	
 	})
@@ -151,11 +139,6 @@ rotaryencoder2.prototype.onRestart = function() {
     var defer=libQ.defer();
 
 	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] onRestart: free resources');
-	// this.onStop()
-	// .then(result=> defer.resolve(result))
-	// .fail(err => defer.reject(err))
-
-	// return defer.promise;
 };
 
 
@@ -165,7 +148,13 @@ rotaryencoder2.prototype.getUIConfig = function() {
     var defer = libQ.defer();
     var self = this;
 
+	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] getUIConfig: starting: ');
+	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] getUIConfig: i18nStrings'+JSON.stringify(self.i18nStrings));
+	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] getUIConfig: i18nStringsDefaults'+JSON.stringify(self.i18nStringsDefaults));
+
     var lang_code = this.commandRouter.sharedVars.get('language_code');
+
+	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] getUIConfig: language code: ' + lang_code + ' dir: ' + __dirname);
 
     self.commandRouter.i18nJson(__dirname+'/i18n/strings_'+lang_code+'.json',
         __dirname+'/i18n/strings_en.json',
@@ -180,7 +169,7 @@ rotaryencoder2.prototype.getUIConfig = function() {
 				uiconf.sections[i].content[2].value = parseInt(self.config.get('pinA' + i)) | 0;
 				uiconf.sections[i].content[3].value = parseInt(self.config.get('pinB' + i)) | 0;
 				uiconf.sections[i].content[4].value.value = self.config.get('dialAction' + i) | 0;
-				uiconf.sections[i].content[4].value.label = self.commandRouter.getI18nString('ROTARYENCODER2.'+dialActions[parseInt(self.config.get('dialAction' + i))|0]);
+				uiconf.sections[i].content[4].value.label = self.getI18nString('ROTARYENCODER2.'+dialActions[parseInt(self.config.get('dialAction' + i))|0]);
 				uiconf.sections[i].content[5].value = self.config.get('socketCmdCCW' + i);
 				uiconf.sections[i].content[6].value = self.config.get('socketDataCCW' + i);
 				uiconf.sections[i].content[7].value = self.config.get('socketCmdCW' + i);
@@ -189,11 +178,11 @@ rotaryencoder2.prototype.getUIConfig = function() {
 				uiconf.sections[i].content[10].value = parseInt(self.config.get('pinPushDebounce' + i)) | 0;
 				uiconf.sections[i].content[11].value = (self.config.get('pushState' + i)==true)
 				uiconf.sections[i].content[12].value.value = self.config.get('pushAction' + i) | 0;
-				uiconf.sections[i].content[12].value.label = self.commandRouter.getI18nString('ROTARYENCODER2.'+btnActions[parseInt(self.config.get('pushAction' + i))|0]);
+				uiconf.sections[i].content[12].value.label = self.getI18nString('ROTARYENCODER2.'+btnActions[parseInt(self.config.get('pushAction' + i))|0]);
 				uiconf.sections[i].content[13].value = self.config.get('socketCmdPush' + i);
 				uiconf.sections[i].content[14].value = self.config.get('socketDataPush' + i);
 				uiconf.sections[i].content[15].value.value = self.config.get('longPushAction' + i) | 0;
-				uiconf.sections[i].content[15].value.label = self.commandRouter.getI18nString('ROTARYENCODER2.'+btnActions[parseInt(self.config.get('longPushAction' + i))|0]);
+				uiconf.sections[i].content[15].value.label = self.getI18nString('ROTARYENCODER2.'+btnActions[parseInt(self.config.get('longPushAction' + i))|0]);
 				uiconf.sections[i].content[16].value = self.config.get('socketCmdLongPush' + i);
 				uiconf.sections[i].content[17].value = self.config.get('socketDataLongPush' + i);	
 			}
@@ -213,38 +202,25 @@ rotaryencoder2.prototype.getConfigurationFiles = function() {
 	return ['config.json'];
 }
 
-rotaryencoder2.prototype.getI18nFile = function (langCode) {
-	const i18nFiles = fs.readdirSync(path.join(__dirname, 'i18n'));
-	const langFile = 'strings_' + langCode + '.json';
-  
-	// check for i18n file fitting the system language
-	if (i18nFiles.some(function (i18nFile) { return i18nFile === langFile; })) {
-	  return path.join(__dirname, 'i18n', langFile);
-	}
-	// return default i18n file
-	return path.join(__dirname, 'i18n', 'strings_en.json');
-};
  
 //Gets called when user saves settings from the GUI
 rotaryencoder2.prototype.updateEncoder = function(data){
 	var self = this;
 	var defer = libQ.defer();
 	var dataString = JSON.stringify(data);
-	var overlayToRemove = -1
 
 	var rotaryIndex = parseInt(dataString.match(/rotaryType([0-9])/)[1]);
-	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] updateEncoder: Rotary'+(rotaryIndex + 1)+'with:' + JSON.stringify(data));
+	if (self.debugLogging) self.logger.info('[ROTARYENCODER2] updateEncoder: Rotary'+(rotaryIndex + 1)+' with:' + JSON.stringify(data));
 
 	self.sanityCheckSettings(rotaryIndex, data)
 	.then(_ => {
-		if (self.config.get('enabled'+rotaryIndex)){
-			return self.deactivateRotaries([rotaryIndex])
-			.then(_=>{
-				return self.deactivateButtons([rotaryIndex])
-			})
-		} else {
-			return defer.resolve;
-		}
+		//disable all rotaries before we make changes
+		//this is necessary, since there seems to be an issue in the Kernel, that breaks the 
+		//eventHandlers if a dtoverlay with low index is removed and others with higher index exist
+		return self.deactivateRotaries([...Array(maxRotaries).keys()])
+		.then(_=>{
+			return self.deactivateButtons([...Array(maxRotaries).keys()])
+		})
 	})
 	.then(_ => {
 		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] updateEncoder: Changing Encoder '+(rotaryIndex + 1)+' Settings to new values');
@@ -267,21 +243,21 @@ rotaryencoder2.prototype.updateEncoder = function(data){
 			self.config.set('socketCmdLongPush'+rotaryIndex, (data['socketCmdLongPush'+rotaryIndex]));
 			self.config.set('socketDataLongPush'+rotaryIndex, (data['socketDataLongPush'+rotaryIndex]));
 			self.config.set('enabled'+rotaryIndex, true);	
-			return self.activateRotaries([rotaryIndex])
-			.then(_=>{
-				return self.activateButtons([rotaryIndex])
-			})
 		} else {
 			self.config.set('enabled'+rotaryIndex, false);
-			return defer.resolve;	
 		}
+		return self.activateRotaries([...Array(maxRotaries).keys()])
+		.then(_=>{
+			return self.activateButtons([...Array(maxRotaries).keys()])
+		})
 	})
 	.then(_ => {
-		self.commandRouter.pushToastMessage('success', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_SAVE_SUCCESS'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_MSG_SAVE')+ (rotaryIndex + 1));
+		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] updateEncoder: SUCCESS with Toast: '+self.getI18nString('ROTARYENCODER2.TOAST_SAVE_SUCCESS')+' ' +self.getI18nString('ROTARYENCODER2.TOAST_MSG_SAVE')+ (rotaryIndex + 1));
+		self.commandRouter.pushToastMessage('success', self.getI18nString('ROTARYENCODER2.TOAST_SAVE_SUCCESS'), self.getI18nString('ROTARYENCODER2.TOAST_MSG_SAVE')+ (rotaryIndex + 1));
 		defer.resolve();	
 	})
 	.fail(err => {
-		self.commandRouter.pushToastMessage('error', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_SAVE_FAIL'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_MSG_SAVE')+ (rotaryIndex + 1));
+		self.commandRouter.pushToastMessage('error', self.getI18nString('ROTARYENCODER2.TOAST_SAVE_FAIL'), self.getI18nString('ROTARYENCODER2.TOAST_MSG_SAVE')+ (rotaryIndex + 1));
 		defer.reject(err);
 	})
 	return defer.promise;
@@ -313,7 +289,7 @@ rotaryencoder2.prototype.sanityCheckSettings = function(rotaryIndex, data){
 		}
 		//check if GPIO pins are integer
 		if (!Number.isInteger(parseInt(data['pinA'+rotaryIndex])) || !Number.isInteger(parseInt(data['pinB'+rotaryIndex])) || !Number.isInteger(parseInt(data['pinPush'+rotaryIndex]))) {
-			self.commandRouter.pushToastMessage('error', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_NEEDS_INTEGER'));
+			self.commandRouter.pushToastMessage('error', self.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.getI18nString('ROTARYENCODER2.TOAST_NEEDS_INTEGER'));
 			if (self.debugLogging) self.logger.error('[ROTARYENCODER2] sanityCheckSettings: Pin values must be Integer ' );
 			defer.reject('Pin value must be integer.');
 		} else { 
@@ -331,20 +307,20 @@ rotaryencoder2.prototype.sanityCheckSettings = function(rotaryIndex, data){
 			}
 			//check if duplicate number used
 			if (newPins.some((item,index) => newPins.indexOf(item) != index)) {
-				self.commandRouter.pushToastMessage('error', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_PINS_DIFFERENT'));
+				self.commandRouter.pushToastMessage('error', self.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.getI18nString('ROTARYENCODER2.TOAST_PINS_DIFFERENT'));
 				self.logger.error('[ROTARYENCODER2] sanityCheckSettings: duplicate pins. new: ' + newPins );
 				defer.reject('Duplicate pin numbers provided.');
 			} else {
 				//check if any of the numbers used is also used in another active rotary
 				allPins = [...otherPins, ...newPins];
 				if (allPins.some((item,index) => allPins.indexOf(item) != index)) {
-					self.commandRouter.pushToastMessage('error', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_PINS_BLOCKED'));
+					self.commandRouter.pushToastMessage('error', self.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.getI18nString('ROTARYENCODER2.TOAST_PINS_BLOCKED'));
 					self.logger.error('[ROTARYENCODER2] sanityCheckSettings: Pin(s) used in other rotary already.');
 					defer.reject('One or more pins already used in other rotary.')
 				} else {
 					//check if Rotary Type is selected
 					if (![1,2,4].includes(data['rotaryType'+rotaryIndex].value)) {
-						self.commandRouter.pushToastMessage('error', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_NO_TYPE'));
+						self.commandRouter.pushToastMessage('error', self.getI18nString('ROTARYENCODER2.TOAST_WRONG_PARAMETER'), self.getI18nString('ROTARYENCODER2.TOAST_NO_TYPE'));
 						self.logger.error('[ROTARYENCODER2] sanityCheckSettings: Periods per tick not set.');
 						defer.reject('Must select periods per tick.')
 					} else {		
@@ -367,7 +343,7 @@ rotaryencoder2.prototype.updateDebugSettings = function (data) {
 	self.config.set('logging', (data['logging']))
 	self.debugLogging = data['logging'];
 	defer.resolve();
-	self.commandRouter.pushToastMessage('success', self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_SAVE_SUCCESS'), self.commandRouter.getI18nString('ROTARYENCODER2.TOAST_DEBUG_SAVE'));
+	self.commandRouter.pushToastMessage('success', self.getI18nString('ROTARYENCODER2.TOAST_SAVE_SUCCESS'), self.getI18nString('ROTARYENCODER2.TOAST_DEBUG_SAVE'));
 	return defer.promise;
 };
 
@@ -397,18 +373,19 @@ rotaryencoder2.prototype.activateRotaries = function (rotaryIndexArray) {
 	if (Array.isArray(rotaryIndexArray)){
 		if (rotaryIndexArray.length > 0) {
 			rotaryIndex = rotaryIndexArray[rotaryIndexArray.length - 1];
-			self.activateRotaries(rotaryIndexArray.slice(0,rotaryIndexArray.length - 1))
+			return self.activateRotaries(rotaryIndexArray.slice(0,rotaryIndexArray.length - 1))
 			.then(_=> {
-				return self.addOverlay(self.config.get('pinA'+rotaryIndex),self.config.get('pinB'+rotaryIndex),self.config.get('rotaryType'+rotaryIndex))
-				.then(_=>{
-					return self.attachListener(self.config.get('pinA'+rotaryIndex));
-				})
-				.then(handle => {
-					self.addEventHandle(handle, rotaryIndex)
-				})		
-			})
-			.then(_=>{
-				defer.resolve();
+				if (self.config.get('enabled'+rotaryIndex)) {
+					return self.addOverlay(self.config.get('pinA'+rotaryIndex),self.config.get('pinB'+rotaryIndex),self.config.get('rotaryType'+rotaryIndex))
+					.then(_=>{
+						return self.attachListener(self.config.get('pinA'+rotaryIndex));
+					})
+					.then(handle => {
+						return self.addEventHandle(handle, rotaryIndex)
+					})								
+				} else {
+					return defer.resolve();
+				}
 			})
 		} else {
 			if (self.debugLogging) self.logger.info('[ROTARYENCODER2] activateRotaries: end of recursion.');
@@ -418,7 +395,6 @@ rotaryencoder2.prototype.activateRotaries = function (rotaryIndexArray) {
 		self.logger.error('[ROTARYENCODER2] activateRotaries: rotaryIndexArray must be an Array');
 		defer.reject('rotaryIndexArray must be an Array of integers')
 	} 
-
 	return defer.promise;
 }
 
@@ -434,19 +410,25 @@ rotaryencoder2.prototype.deactivateRotaries = function (rotaryIndexArray) {
 		if (rotaryIndexArray.length > 0) {
 			rotaryIndex = rotaryIndexArray[0];
 			self.deactivateRotaries(rotaryIndexArray.slice(1,rotaryIndexArray.length))
-			.then(_=> {return self.detachListener(self.handles[rotaryIndex])})
-			.then(_=>{ return self.checkOverlayExists(rotaryIndex)})
-			.then(idx=>{if (idx > -1) return self.removeOverlay(idx)})
-			.then(_=>{
-				if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateRotaries: deactivated rotary' + (rotaryIndex + 1));
-				defer.resolve();
+			.then(_=> {
+				if (self.config.get('enabled'+rotaryIndex)) {
+					return self.detachListener(self.handles[rotaryIndex])
+					.then(_=>{ return self.checkOverlayExists(rotaryIndex)})
+					.then(idx=>{if (idx > -1) return self.removeOverlay(idx)})
+					.then(_=>{
+						if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateRotaries: deactivated rotary' + (rotaryIndex + 1));
+						return defer.resolve();
+					})												
+				} else {
+					return defer.resolve()
+				}
 			})
 		} else {
 			if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateRotaries: end of recursion.');
 			defer.resolve();
 		}
 	} else {
-		self.logger.error('[ROTARYENCODER2] deactivateRotaries: rotaryIndexArray must be an Array');
+		self.logger.error('[ROTARYENCODER2] deactivateRotaries: rotaryIndexArray must be an Array: ' + rotaryIndexArray);
 		defer.reject('rotaryIndexArray must be an Array of integers')
 	} 
 	return defer.promise;
@@ -464,46 +446,50 @@ rotaryencoder2.prototype.activateButtons = function (rotaryIndexArray) {
 			rotaryIndex = rotaryIndexArray[rotaryIndexArray.length - 1];
 			self.activateButtons(rotaryIndexArray.slice(0,rotaryIndexArray.length - 1))
 			.then(_=> {
-				var gpio = self.config.get('pinPush'+rotaryIndex);
-				//configure pushButton if not disabled
-				if (Number.isInteger(gpio) && (gpio > 0)) {
-					gpio = parseInt(gpio);
-					var debounce = self.config.get('pinPushDebounce'+rotaryIndex);
-					if (!Number.isInteger(debounce)){
-						debounce = 0
+				if (self.config.get('enabled'+rotaryIndex)) {
+					var gpio = self.config.get('pinPush'+rotaryIndex);
+					//configure pushButton if not disabled
+					if (Number.isInteger(gpio) && (gpio > 0)) {
+						gpio = parseInt(gpio);
+						var debounce = self.config.get('pinPushDebounce'+rotaryIndex);
+						if (!Number.isInteger(debounce)){
+							debounce = 0
+						} else {
+							debounce = parseInt(debounce);
+						};
+						if (self.debugLogging) self.logger.info('[ROTARYENCODER2] activateButtons: Now assign push button: ' + (rotaryIndex + 1));
+						self.buttons[rotaryIndex] = new Gpio(gpio, 'in', 'both', {debounceTimeout: debounce});
+						self.buttons[rotaryIndex].watch((err,value) => {
+							if (err) {
+								return self.logger.error('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' caused an error.')
+							}
+							switch (value==self.config.get('pushState'+rotaryIndex)) {
+								case true: //(falling edge & active_high) or (rising edge and active low) = released
+									var pushTime = Date.now() - self.pushDownTime[rotaryIndex]
+									if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' released after '+pushTime+'ms.');
+									if (pushTime > 1500) {
+										self.emitPushCommand(true, rotaryIndex)
+									} else {
+										self.emitPushCommand(false, rotaryIndex)
+									}
+									break;
+							
+								case false: //(falling edge & active low) or (rising edge and active high) = pressed
+									if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' pressed.');
+									self.pushDownTime[rotaryIndex] = Date.now();						
+									break;
+							
+								default:
+									break;
+							}
+						})
+						if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' now resolving.');
+						return defer.resolve();	
 					} else {
-						debounce = parseInt(debounce);
-					};
-					if (self.debugLogging) self.logger.info('[ROTARYENCODER2] activateButtons: Now assign push button: ' + (rotaryIndex + 1));
-					self.buttons[rotaryIndex] = new Gpio(gpio, 'in', 'both', {debounceTimeout: debounce});
-					self.buttons[rotaryIndex].watch((err,value) => {
-						if (err) {
-							return self.logger.error('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' caused an error.')
-						}
-						switch (value==self.config.get('pushState'+rotaryIndex)) {
-							case true: //(falling edge & active_high) or (rising edge and active low) = released
-								var pushTime = Date.now() - self.pushDownTime[rotaryIndex]
-								if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' released after '+pushTime+'ms.');
-								if (pushTime > 1500) {
-									self.emitPushCommand(true, rotaryIndex)
-								} else {
-									self.emitPushCommand(false, rotaryIndex)
-								}
-								break;
-						
-							case false: //(falling edge & active low) or (rising edge and active high) = pressed
-								if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' pressed.');
-								self.pushDownTime[rotaryIndex] = Date.now();						
-								break;
-						
-							default:
-								break;
-						}
-					})
-					if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' now resolving.');
-					return defer.resolve();	
+						if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' is disabled (no Gpio).');
+						return defer.resolve();	
+					}						
 				} else {
-					if (self.debugLogging) self.logger.info('[ROTARYENCODER2] Push Button '+(rotaryIndex+1)+' is disabled (no Gpio).');
 					return defer.resolve();	
 				}
 			})
@@ -532,14 +518,18 @@ rotaryencoder2.prototype.deactivateButtons = function (rotaryIndexArray) {
 			rotaryIndex = rotaryIndexArray[0];
 			self.deactivateButtons(rotaryIndexArray.slice(1,rotaryIndexArray.length))
 			.then(_=>{
-				if (self.config.get('pinPush1'+rotaryIndex)>0) {
-					self.buttons[rotaryIndex].unwatchAll();
-					self.buttons[rotaryIndex].unexport();
-					if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateButtons: deactivated button ' + (rotaryIndex + 1));
-					defer.resolve();	
+				if (self.config.get('enabled'+rotaryIndex)) {
+					if (self.config.get('pinPush1'+rotaryIndex)>0) {
+						self.buttons[rotaryIndex].unwatchAll();
+						self.buttons[rotaryIndex].unexport();
+						if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateButtons: deactivated button ' + (rotaryIndex + 1));
+						defer.resolve();	
+					} else {
+						if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateButtons: button ' + (rotaryIndex + 1) + ' is disabled.');
+						defer.resolve();	
+					}						
 				} else {
-					if (self.debugLogging) self.logger.info('[ROTARYENCODER2] deactivateButtons: button ' + (rotaryIndex + 1) + ' is disabled.');
-					defer.resolve();	
+					defer.resolve();
 				}
 
 			})
@@ -831,3 +821,34 @@ rotaryencoder2.prototype.detachListener = function (handle){
 	defer.resolve();
 	return defer.promise;
 }
+
+// Retrieve a string
+rotaryencoder2.prototype.getI18nString = function (key) {
+    var self = this;
+
+	key = key.replace(/^ROTARYENCODER2\./,'');
+    if (self.i18nStrings['ROTARYENCODER2'][key] !== undefined) {
+		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] getI18nString("'+key+'"):'+ self.i18nStrings['ROTARYENCODER2'][key]);
+        return self.i18nStrings['ROTARYENCODER2'][key];
+	} else {
+		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] getI18nString("'+key+'")'+ self.i18nStringsDefaults['ROTARYENCODER2'][key]);
+        return self.i18nStringsDefaults['ROTARYENCODER2'][key];
+	};
+}
+// A method to get some language strings used by the plugin
+rotaryencoder2.prototype.loadI18nStrings = function() {
+    var self = this;
+
+    try {
+        var language_code = this.commandRouter.sharedVars.get('language_code');
+		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] loadI18nStrings: '+__dirname + '/i18n/strings_' + language_code + ".json");
+        self.i18nStrings = fs.readJsonSync(__dirname + '/i18n/strings_' + language_code + ".json");
+		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] loadI18nStrings: loaded: '+JSON.stringify(self.i18nStrings));
+    }
+    catch (e) {
+		if (self.debugLogging) self.logger.info('[ROTARYENCODER2] loadI18nStrings: ' + language_code + ' not found. Fallback to en');
+        self.i18nStrings = fs.readJsonSync(__dirname + '/i18n/strings_en.json');
+    }
+
+    self.i18nStringsDefaults = fs.readJsonSync(__dirname + '/i18n/strings_en.json');
+};
