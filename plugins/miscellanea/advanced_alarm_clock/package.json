@@ -11,7 +11,8 @@
 	"volumio_info": {
 		"prettyName": "advanced alarm clock",
 		"icon": "fa-lightbulb-o",
-		"plugin_type": "miscellanea"
+		"plugin_type": "miscellanea",
+		"boot_priority": 10
 	},
 	"dependencies": {
 		"fs-extra": "^0.28.0",
