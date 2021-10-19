@@ -4,10 +4,23 @@
   },
   "sections": [
     {
-      "id": "StartHour",
-      "element": "select",
-      "label": "Alarm Hour",
-      "value": { "value": 12, "label": "12" },
+      "id": "alarm_setup",
+      "element": "section",
+      "label": "Setup your Alarm",
+      "icon": "fa-plug",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "miscellanea/advanced_alarm_clock",
+        "method": "saveConfig"
+      },
+      "saveButton": {
+        "label": "TRANSLATE.SAVE",
+        "data": [
+          "enableAlarmSwitch",
+          "startHour",
+          "startMin"
+        ]
+      },
       "content": [
         {
           "id": "enableAlarmSwitch",
@@ -16,12 +29,10 @@
           "value": false
         },
         {
-          "id": "StartHour",
+          "id": "startHour",
           "element": "select",
           "label": "Start hour",
-          "value": {"value": 12,
-                    "label": "12"
-          },
+          "value": { "value": 12, "label": "12" },
           "options": [
             {
               "value": 1,
@@ -126,12 +137,10 @@
           }
         },
         {
-          "id": "StartMin",
+          "id": "startMin",
           "element": "select",
           "label": "Start min",
-          "value": {"value": 0,
-                    "label": "00"
-          },
+          "value": { "value": 0, "label": "00" },
           "options": [
             {
               "value": 0,
@@ -383,5 +392,3 @@
     }
   ]
 }
-
-
