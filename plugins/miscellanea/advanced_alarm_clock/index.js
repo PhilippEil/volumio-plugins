@@ -27,6 +27,8 @@ advancedAlarmClock.prototype.onVolumioStart = function()
 	this.config = new (require('v-conf'))();
 	this.config.loadFile(configFile);
 
+	self.logger.info("AdvancedAlarmClock initialized");
+
     return libQ.resolve();
 }
 
@@ -63,14 +65,32 @@ advancedAlarmClock.prototype.getUIConfig = function() {
     var defer = libQ.defer();
     var self = this;
 
-    var lang_code = this.commandRouter.sharedVars.get('language_code');
+	self.logger.info('AdvancedAlarmClock: Getting UI config');
+
+	//Just for now..
+	var lang_code = 'en';
+    //var lang_code = this.commandRouter.sharedVars.get('language_code');
 
     self.commandRouter.i18nJson(__dirname+'/i18n/strings_'+lang_code+'.json',
         __dirname+'/i18n/strings_en.json',
         __dirname + '/UIConfig.json')
         .then(function(uiconf)
         {
+			var i = 0;
+			actions.forEach(function(action, index, array) {
+ 				
+ 				// Strings for config
+				var c1 = action.concat('.enabled');
+				var c2 = action.concat('.value');
+				
+				// accessor supposes actions and uiconfig items are in SAME order
+				// this is potentially dangerous: rewrite with a JSON search of "id" value ?				
+				uiconf.sections[0].content[2*i].value = self.config.get(c1);
+				uiconf.sections[0].content[2*i+1].value.value = self.config.get(c2);
+				uiconf.sections[0].content[2*i+1].value.label = self.config.get(c2).toString();
 
+				i = i + 1;
+			});
 
             defer.resolve(uiconf);
         })
@@ -80,6 +100,32 @@ advancedAlarmClock.prototype.getUIConfig = function() {
         });
 
     return defer.promise;
+};
+
+advancedAlarmClock.prototype.saveConfig = function(data)
+{
+	var self = this;
+
+	self.logger.info('AdvancedAlarmClock: Saving UI config');
+
+	actions.forEach(function(action, index, array) {
+ 		// Strings for data fields
+		var s1 = action.concat('Enabled');
+		var s2 = action.concat('value');
+
+		// Strings for config
+		var c1 = action.concat('.enabled');
+		var c3 = action.concat('.value');
+
+		self.config.set(c1, data[s1]);
+		self.config.set(c2, data[s2]['value']);
+	});
+
+	self.clearTriggers()
+		.then(self.createTriggers());
+
+	self.commandRouter.pushToastMessage('success',"Advanced Alarm Clock", "Configuration saved");
+	self.logger.info('AdvancedAlarmClock: Done');
 };
 
 advancedAlarmClock.prototype.getConfigurationFiles = function() {
